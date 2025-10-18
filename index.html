@@ -50,9 +50,17 @@
 
                 <div class="form-group">
                     <label for="password" class="form-label">Password</label>
-                    <input type="password" class="form-control" id="password" placeholder="Minimum 8 characters" required>
+                    <input type="password" class="form-control" id="password" placeholder="Minimum 8 characters with special requirements" required>
                     <div id="password-feedback" class="invalid-feedback">
-                        Password must be at least 8 characters long.
+                        Password must be at least 8 characters long and include a digit, a lowercase letter, an uppercase letter, and one special character (!@#$%^&*).
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="confirm-password" class="form-label">Confirm Password</label>
+                    <input type="password" class="form-control" id="confirm-password" placeholder="Re-enter your password" required>
+                    <div id="confirm-password-feedback" class="invalid-feedback">
+                        Passwords do not match.
                     </div>
                 </div>
 
@@ -70,6 +78,7 @@
             const nameInput = document.querySelector('#name');
             const emailInput = document.querySelector('#email');
             const passwordInput = document.querySelector('#password');
+            const confirmPasswordInput = document.querySelector('#confirm-password');
             const submitButton = document.querySelector('#submit-button');
             const formResult = document.querySelector('#form-result');
             const registrationForm = document.querySelector('#registration-form');
@@ -77,6 +86,11 @@
             const nameFeedback = document.querySelector('#name-feedback');
             const emailFeedback = document.querySelector('#email-feedback');
             const passwordFeedback = document.querySelector('#password-feedback');
+            const confirmPasswordFeedback = document.querySelector('#confirm-password-feedback');
+
+            // Placeholder for the evaluation URL. In a real scenario, this would be provided.
+            // Using JSONPlaceholder for testing POST requests.
+            const evaluation_url = 'https://jsonplaceholder.typicode.com/posts'; 
 
             // Validation functions
             function validateName() {
@@ -93,8 +107,20 @@
             }
 
             function validatePassword() {
-                const isValid = passwordInput.value.length >= 8;
-                updateValidationState(passwordInput, passwordFeedback, isValid, 'Password must be at least 8 characters long.');
+                // At least 8 characters, one digit, one lowercase, one uppercase, one special char (!@#$%^&*)
+                const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*]).{8,}$/;
+                const isValid = passwordPattern.test(passwordInput.value);
+                updateValidationState(passwordInput, passwordFeedback, isValid, 'Password must be at least 8 characters long and include a digit, a lowercase letter, an uppercase letter, and one special character (!@#$%^&*).');
+                return isValid;
+            }
+
+            function validateConfirmPassword() {
+                const passwordValue = passwordInput.value;
+                const confirmPasswordValue = confirmPasswordInput.value;
+                // Valid if not empty AND matches password
+                const isValid = confirmPasswordValue.length > 0 && passwordValue === confirmPasswordValue;
+                updateValidationState(confirmPasswordInput, confirmPasswordFeedback, isValid,
+                    confirmPasswordValue.length === 0 ? 'Confirm Password cannot be empty.' : 'Passwords do not match.');
                 return isValid;
             }
 
@@ -103,11 +129,10 @@
                 if (isValid) {
                     inputElement.classList.remove('is-invalid');
                     inputElement.classList.add('is-valid');
-                    // Bootstrap's .invalid-feedback is hidden by default when .is-invalid is not present
                 } else {
                     inputElement.classList.remove('is-valid');
                     inputElement.classList.add('is-invalid');
-                    feedbackElement.textContent = invalidMessage; // Set the specific invalid message
+                    feedbackElement.textContent = invalidMessage;
                 }
             }
 
@@ -116,39 +141,79 @@
                 const isNameValid = validateName();
                 const isEmailValid = validateEmail();
                 const isPasswordValid = validatePassword();
+                // Validate confirm password. It depends on the password field's value.
+                const isConfirmPasswordValid = validateConfirmPassword();
 
-                submitButton.disabled = !(isNameValid && isEmailValid && isPasswordValid);
-                return (isNameValid && isEmailValid && isPasswordValid); // Return overall validity
+                submitButton.disabled = !(isNameValid && isEmailValid && isPasswordValid && isConfirmPasswordValid);
+                return (isNameValid && isEmailValid && isPasswordValid && isConfirmPasswordValid);
             }
 
             // Event Listeners for real-time validation
             nameInput.addEventListener('input', checkAllFields);
             emailInput.addEventListener('input', checkAllFields);
             passwordInput.addEventListener('input', checkAllFields);
+            confirmPasswordInput.addEventListener('input', checkAllFields);
 
             // Handle form submission
-            registrationForm.addEventListener('submit', function(event) {
+            registrationForm.addEventListener('submit', async function(event) {
                 event.preventDefault(); // Prevent default form submission
 
                 // Re-run validation to ensure final state and update UI
                 const allFieldsValid = checkAllFields();
 
                 if (allFieldsValid) {
-                    formResult.textContent = 'Success! Registration successful. Welcome.';
-                    formResult.classList.remove('text-danger');
-                    formResult.classList.add('text-success');
+                    formResult.textContent = 'Submission in progress...';
+                    formResult.classList.remove('text-success', 'text-danger');
+                    formResult.classList.add('text-info'); // Indicate progress
+                    submitButton.disabled = true; // Disable during fetch operation
 
-                    // Optional: Clear form after successful submission
-                    registrationForm.reset();
-                    // Reset validation states by removing classes
-                    nameInput.classList.remove('is-valid', 'is-invalid');
-                    emailInput.classList.remove('is-valid', 'is-invalid');
-                    passwordInput.classList.remove('is-valid', 'is-invalid');
-                    submitButton.disabled = true; // Disable button again after reset
+                    const formData = {
+                        name: nameInput.value.trim(),
+                        email: emailInput.value,
+                        password: passwordInput.value // Send the password
+                    };
+
+                    try {
+                        const response = await fetch(evaluation_url, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify(formData)
+                        });
+
+                        if (response.ok) { // Check if HTTP status is 200-299
+                            formResult.textContent = 'Submission successful!';
+                            formResult.classList.remove('text-info', 'text-danger');
+                            formResult.classList.add('text-success');
+
+                            // Clear form and reset validation states
+                            registrationForm.reset();
+                            nameInput.classList.remove('is-valid', 'is-invalid');
+                            emailInput.classList.remove('is-valid', 'is-invalid');
+                            passwordInput.classList.remove('is-valid', 'is-invalid');
+                            confirmPasswordInput.classList.remove('is-valid', 'is-invalid');
+                            submitButton.disabled = true; // Keep disabled until new valid input
+                        } else {
+                            const errorData = await response.json().catch(() => ({ message: response.statusText || 'Unknown error' }));
+                            formResult.textContent = `Submission failed: ${errorData.message || response.statusText} (Status: ${response.status})`;
+                            formResult.classList.remove('text-success', 'text-info');
+                            formResult.classList.add('text-danger');
+                            submitButton.disabled = false; // Re-enable if submission failed
+                        }
+                    } catch (error) {
+                        // Handle network errors (e.g., no internet, server unreachable)
+                        formResult.textContent = `Submission failed: ${error.message}`;
+                        formResult.classList.remove('text-success', 'text-info');
+                        formResult.classList.add('text-danger');
+                        submitButton.disabled = false; // Re-enable if network error
+                    }
                 } else {
                     formResult.textContent = 'Please correct the errors in the form.';
-                    formResult.classList.remove('text-success');
+                    formResult.classList.remove('text-success', 'text-info');
                     formResult.classList.add('text-danger');
+                    // Submit button is already disabled by checkAllFields if not valid
                 }
             });
 
