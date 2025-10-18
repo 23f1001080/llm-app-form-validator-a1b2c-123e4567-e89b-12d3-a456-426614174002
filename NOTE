@@ -1,0 +1,1 @@
+The email validation regex /^[\S]+@[\S]+\.[\S]+$/ uses \S instead of [^\s] for brevity and clarity within a JSON string that requires escaping backslashes. Both mean 'any non-whitespace character'.
