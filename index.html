@@ -64,8 +64,22 @@
                     </div>
                 </div>
 
+                <div class="form-group">
+                    <label for="phone" class="form-label">Phone Number</label>
+                    <input type="tel" class="form-control" id="phone" placeholder="e.g., 1234567890" required pattern="\d{10}">
+                    <div id="phone-feedback" class="invalid-feedback">
+                        Please enter a valid 10-digit phone number.
+                    </div>
+                </div>
+
                 <button type="submit" class="btn btn-primary w-100" id="submit-button" disabled>Register</button>
             </form>
+            <div id="loading-spinner" class="text-center mt-3" style="display: none;">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="text-muted mt-2">Submitting...</p>
+            </div>
             <div id="form-result" class="mt-4 text-center"></div>
         </div>
     </div>
@@ -79,14 +93,17 @@
             const emailInput = document.querySelector('#email');
             const passwordInput = document.querySelector('#password');
             const confirmPasswordInput = document.querySelector('#confirm-password');
+            const phoneInput = document.querySelector('#phone'); // New phone input
             const submitButton = document.querySelector('#submit-button');
             const formResult = document.querySelector('#form-result');
             const registrationForm = document.querySelector('#registration-form');
+            const loadingSpinner = document.querySelector('#loading-spinner'); // New loading spinner
 
             const nameFeedback = document.querySelector('#name-feedback');
             const emailFeedback = document.querySelector('#email-feedback');
             const passwordFeedback = document.querySelector('#password-feedback');
             const confirmPasswordFeedback = document.querySelector('#confirm-password-feedback');
+            const phoneFeedback = document.querySelector('#phone-feedback'); // New phone feedback
 
             // Placeholder for the evaluation URL. In a real scenario, this would be provided.
             // Using JSONPlaceholder for testing POST requests.
@@ -124,6 +141,14 @@
                 return isValid;
             }
 
+            function validatePhone() {
+                // Exactly 10 digits
+                const phonePattern = /^\d{10}$/;
+                const isValid = phonePattern.test(phoneInput.value.trim());
+                updateValidationState(phoneInput, phoneFeedback, isValid, 'Please enter a valid 10-digit phone number.');
+                return isValid;
+            }
+
             // Helper to update Bootstrap validation classes and feedback messages
             function updateValidationState(inputElement, feedbackElement, isValid, invalidMessage) {
                 if (isValid) {
@@ -143,9 +168,12 @@
                 const isPasswordValid = validatePassword();
                 // Validate confirm password. It depends on the password field's value.
                 const isConfirmPasswordValid = validateConfirmPassword();
+                const isPhoneValid = validatePhone(); // New validation
 
-                submitButton.disabled = !(isNameValid && isEmailValid && isPasswordValid && isConfirmPasswordValid);
-                return (isNameValid && isEmailValid && isPasswordValid && isConfirmPasswordValid);
+                // All fields must be valid to enable the submit button
+                const allFieldsValid = isNameValid && isEmailValid && isPasswordValid && isConfirmPasswordValid && isPhoneValid;
+                submitButton.disabled = !allFieldsValid;
+                return allFieldsValid;
             }
 
             // Event Listeners for real-time validation
@@ -153,15 +181,17 @@
             emailInput.addEventListener('input', checkAllFields);
             passwordInput.addEventListener('input', checkAllFields);
             confirmPasswordInput.addEventListener('input', checkAllFields);
+            phoneInput.addEventListener('input', checkAllFields); // New event listener
 
             // Handle form submission
             registrationForm.addEventListener('submit', async function(event) {
                 event.preventDefault(); // Prevent default form submission
 
-                // Re-run validation to ensure final state and update UI
+                // Re-run validation to ensure final state and update UI, crucial before submission attempt
                 const allFieldsValid = checkAllFields();
 
                 if (allFieldsValid) {
+                    loadingSpinner.style.display = 'block'; // Show spinner
                     formResult.textContent = 'Submission in progress...';
                     formResult.classList.remove('text-success', 'text-danger');
                     formResult.classList.add('text-info'); // Indicate progress
@@ -170,7 +200,8 @@
                     const formData = {
                         name: nameInput.value.trim(),
                         email: emailInput.value,
-                        password: passwordInput.value // Send the password
+                        password: passwordInput.value, // Send the password
+                        phone: phoneInput.value.trim() // Include phone number
                     };
 
                     try {
@@ -194,6 +225,7 @@
                             emailInput.classList.remove('is-valid', 'is-invalid');
                             passwordInput.classList.remove('is-valid', 'is-invalid');
                             confirmPasswordInput.classList.remove('is-valid', 'is-invalid');
+                            phoneInput.classList.remove('is-valid', 'is-invalid'); // Clear phone validation state
                             submitButton.disabled = true; // Keep disabled until new valid input
                         } else {
                             const errorData = await response.json().catch(() => ({ message: response.statusText || 'Unknown error' }));
@@ -208,9 +240,11 @@
                         formResult.classList.remove('text-success', 'text-info');
                         formResult.classList.add('text-danger');
                         submitButton.disabled = false; // Re-enable if network error
+                    } finally {
+                        loadingSpinner.style.display = 'none'; // Always hide spinner after attempt
                     }
                 } else {
-                    formResult.textContent = 'Please correct the errors in the form.';
+                    formResult.textContent = 'Please correct the errors in the form before submitting.';
                     formResult.classList.remove('text-success', 'text-info');
                     formResult.classList.add('text-danger');
                     // Submit button is already disabled by checkAllFields if not valid
